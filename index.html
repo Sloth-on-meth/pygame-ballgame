@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hexagon Physics Simulation</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #111; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<canvas id="sim"></canvas>
+<script>
+const canvas = document.getElementById("sim");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const CENTER = { x: canvas.width / 2, y: canvas.height / 2 };
+const HEX_RADIUS = 200;
+const BALL_RADIUS = 10;
+const GRAVITY = 0.1;
+const FRICTION = 0.99;
+const WATER_COUNT = 200;
+const WATER_RADIUS = 2;
+
+let hexRotation = 0;
+
+function hexagonVertices(cx, cy, radius, rotation) {
+  let verts = [];
+  for (let i = 0; i < 6; i++) {
+    let angle = rotation + (Math.PI / 3) * i;
+    verts.push({
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle)
+    });
+  }
+  return verts;
+}
+
+function pointInHexagon(p, verts) {
+  let count = 0;
+  for (let i = 0; i < verts.length; i++) {
+    let a = verts[i];
+    let b = verts[(i + 1) % verts.length];
+    if (((a.y > p.y) !== (b.y > p.y)) &&
+        (p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)) {
+      count++;
+    }
+  }
+  return count % 2 === 1;
+}
+
+let ball = {
+  x: CENTER.x,
+  y: CENTER.y,
+  vx: 2,
+  vy: 0
+};
+
+let water = [];
+for (let i = 0; i < WATER_COUNT; i++) {
+  water.push({
+    x: CENTER.x + Math.random() * 20 - 10,
+    y: CENTER.y + Math.random() * 20 - 10,
+    vx: Math.random() * 2 - 1,
+    vy: Math.random() * 2 - 1
+  });
+}
+
+function updatePhysics(verts) {
+  // Ball physics
+  ball.vy += GRAVITY;
+  ball.vx *= FRICTION;
+  ball.vy *= FRICTION;
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  if (!pointInHexagon(ball, verts)) {
+    // Reflect back to center roughly
+    let dx = ball.x - CENTER.x;
+    let dy = ball.y - CENTER.y;
+    let len = Math.sqrt(dx * dx + dy * dy);
+    ball.x = CENTER.x + (dx / len) * (HEX_RADIUS - BALL_RADIUS);
+    ball.y = CENTER.y + (dy / len) * (HEX_RADIUS - BALL_RADIUS);
+    ball.vx *= -0.8;
+    ball.vy *= -0.8;
+  }
+
+  // Water physics
+  for (let p of water) {
+    p.vy += GRAVITY / 2;
+    p.vx *= FRICTION;
+    p.vy *= FRICTION;
+    p.x += p.vx;
+    p.y += p.vy;
+
+    if (!pointInHexagon(p, verts)) {
+      let dx = p.x - CENTER.x;
+      let dy = p.y - CENTER.y;
+      let len = Math.sqrt(dx * dx + dy * dy);
+      p.x = CENTER.x + (dx / len) * (HEX_RADIUS - WATER_RADIUS);
+      p.y = CENTER.y + (dy / len) * (HEX_RADIUS - WATER_RADIUS);
+      p.vx *= -0.5;
+      p.vy *= -0.5;
+    }
+  }
+}
+
+function drawHexagon(verts) {
+  ctx.beginPath();
+  ctx.moveTo(verts[0].x, verts[0].y);
+  for (let i = 1; i < verts.length; i++) {
+    ctx.lineTo(verts[i].x, verts[i].y);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawBall() {
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, 2 * Math.PI);
+  ctx.fillStyle = "orange";
+  ctx.fill();
+}
+
+function drawWater() {
+  for (let p of water) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, WATER_RADIUS, 0, 2 * Math.PI);
+    ctx.fillStyle = "cyan";
+    ctx.fill();
+  }
+}
+
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  hexRotation += 0.01;
+  let verts = hexagonVertices(CENTER.x, CENTER.y, HEX_RADIUS, hexRotation);
+  updatePhysics(verts);
+  drawHexagon(verts);
+  drawBall();
+  drawWater();
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
